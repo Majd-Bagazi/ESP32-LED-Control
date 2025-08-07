@@ -1,0 +1,62 @@
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiMulti.h>
+#include <HTTPClient.h>
+
+#define USE_SERIAL Serial
+#define LED_BUILTIN 2  // المنفذ الخاص بلمبة VEMOS D1 Mini ESP32
+
+WiFiMulti wifiMulti;
+
+void setup() {
+  USE_SERIAL.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);  // تعريف المنفذ كمخرج
+
+  USE_SERIAL.println();
+  USE_SERIAL.println("[SETUP] بدء الاتصال...");
+
+  for (uint8_t t = 4; t > 0; t--) {
+    USE_SERIAL.printf("[SETUP] الانتظار %d...\n", t);
+    USE_SERIAL.flush();
+    delay(1000);
+  }
+
+  wifiMulti.addAP("Majd", "**********");  // بيانات الواي فاي
+}
+
+void loop() {
+  if (wifiMulti.run() == WL_CONNECTED) {
+    HTTPClient http;
+
+    USE_SERIAL.println("[HTTP] بدء الاتصال بالسيرفر...");
+    http.begin("https://s-m.com.sa/r2/test/retrieve.php");  // رابط السيرفر
+
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      USE_SERIAL.printf("[HTTP] الكود المسترجع: %d\n", httpCode);
+
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        USE_SERIAL.println("[HTTP] البيانات المسترجعة:");
+        USE_SERIAL.println(payload);
+
+        int value = payload.toInt();  // تحويل القيمة إلى رقم
+
+        if (value == 0) {
+          digitalWrite(LED_BUILTIN, LOW);  // إطفاء اللمبة
+          USE_SERIAL.println("[LED] تم إطفاء اللمبة");
+        } else {
+          digitalWrite(LED_BUILTIN, HIGH); // تشغيل اللمبة
+          USE_SERIAL.println("[LED] تم تشغيل اللمبة");
+        }
+      }
+    } else {
+      USE_SERIAL.printf("[HTTP] فشل الاتصال، الخطأ: %s\n", http.errorToString(httpCode).c_str());
+    }
+
+    http.end();
+  }
+
+  delay(5000);  // الانتظار 5 ثواني قبل التكرار
+}
